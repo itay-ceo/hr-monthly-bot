@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install 2>&1)",
+      "Bash(node -e \"\n  // Quick syntax and require check - don't actually connect to Slack\n  require\\('./src/db'\\);\n  require\\('./src/messages'\\);\n  require\\('./src/modal'\\);\n  require\\('./src/excel'\\);\n  require\\('./src/commands'\\);\n  require\\('./src/scheduler'\\);\n  console.log\\('All modules loaded successfully'\\);\n\" 2>&1)",
+      "Bash(timeout 15 node src/app.js 2>&1 || true)",
+      "Bash(node -e \"\nconst { setTimeout } = require\\('timers/promises'\\);\nconst cp = require\\('child_process'\\);\nconst child = cp.spawn\\('node', ['src/app.js'], { stdio: 'pipe', cwd: '/Users/itaynagler/hr-monthly-bot' }\\);\nlet output = '';\nchild.stdout.on\\('data', d => output += d.toString\\(\\)\\);\nchild.stderr.on\\('data', d => output += d.toString\\(\\)\\);\nsetTimeout\\(12000\\).then\\(\\(\\) => { child.kill\\(\\); console.log\\(output\\); }\\);\n\" 2>&1)",
+      "Bash(tree -L 2 -I 'node_modules' /Users/itaynagler/hr-monthly-bot 2>/dev/null || find /Users/itaynagler/hr-monthly-bot -not -path '*/node_modules/*' -type f | head -30)",
+      "Bash(npm uninstall node-cron 2>&1)"
+    ]
+  }
+}
