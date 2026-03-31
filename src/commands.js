@@ -1,6 +1,6 @@
 const { sendReportToAll, sendReminders, getTargetMembers, getAllHumanMembers, getMonthName, isAdmin } = require('./messages');
 const { generateExcel } = require('./excel');
-const { getReportsForMonth, addEmployee, removeEmployee, getEmployeeIds, setActivePeriod, getActivePeriod } = require('./db');
+const { getReportsForMonth, addEmployee, removeEmployee, getEmployeeIds, setActivePeriod, getActivePeriod, deleteReportsForMonth } = require('./db');
 const path = require('path');
 
 // === Active Period ===
@@ -52,7 +52,8 @@ function buildAdminMenu() {
         elements: [
           { type: 'button', text: { type: 'plain_text', text: '➕ Add Employee' }, action_id: 'admin_add_employee' },
           { type: 'button', text: { type: 'plain_text', text: '➖ Remove Employee' }, action_id: 'admin_remove_employee' },
-          { type: 'button', text: { type: 'plain_text', text: '📅 New Month' }, action_id: 'admin_new_month' }
+          { type: 'button', text: { type: 'plain_text', text: '📅 New Month' }, action_id: 'admin_new_month' },
+          { type: 'button', text: { type: 'plain_text', text: '🔄 Reset Period' }, action_id: 'admin_reset', style: 'danger' }
         ]
       }
     ]
@@ -130,6 +131,12 @@ function handleList() {
   const ids = getEmployeeIds();
   if (ids.length === 0) return 'No employees configured — all workspace members are targeted.';
   return `*👥 Employee List (${ids.length}):*\n${ids.map((id, i) => `${i + 1}. <@${id}>`).join('\n')}`;
+}
+
+function handleReset() {
+  const { month, year } = getActiveOrCurrentPeriod();
+  const deleted = deleteReportsForMonth(month, year);
+  return `✅ Reset complete. All submissions for ${getMonthName(month)} ${year} have been cleared (${deleted} removed). You can now send reports again.`;
 }
 
 function handleAdd(targetUserId) {
@@ -224,6 +231,11 @@ function registerCommands(app) {
         break;
       }
 
+      case 'reset': {
+        await respond({ text: handleReset(), response_type: 'ephemeral' });
+        break;
+      }
+
       default: {
         const addMatch = (command.text || '').match(/^add\s+<@(U[A-Z0-9]+)(?:\|[^>]*)?>$/i);
         const removeMatch = (command.text || '').match(/^remove\s+<@(U[A-Z0-9]+)(?:\|[^>]*)?>$/i);
@@ -315,6 +327,13 @@ function registerCommands(app) {
     const userId = body.user.id;
     if (!isAdmin(userId)) return;
     await client.chat.postMessage({ channel: userId, text: handleNewMonth() });
+  });
+
+  app.action('admin_reset', async ({ ack, body, client }) => {
+    await ack();
+    const userId = body.user.id;
+    if (!isAdmin(userId)) return;
+    await client.chat.postMessage({ channel: userId, text: handleReset() });
   });
 
   // --- Add Employee Modal ---

@@ -152,4 +152,9 @@ function getActivePeriod() {
   return db.prepare('SELECT month, year FROM active_period WHERE id = 1').get() || null;
 }
 
-module.exports = { getDb, saveReport, getReportsForMonth, hasSubmitted, addEmployee, removeEmployee, getEmployeeIds, isEmployeeTablePopulated, setActivePeriod, getActivePeriod };
+function deleteReportsForMonth(month, year) {
+  const db = getDb();
+  return db.prepare('DELETE FROM reports WHERE month = ? AND year = ?').run(month, year).changes;
+}
+
+module.exports = { getDb, saveReport, getReportsForMonth, hasSubmitted, addEmployee, removeEmployee, getEmployeeIds, isEmployeeTablePopulated, setActivePeriod, getActivePeriod, deleteReportsForMonth };
