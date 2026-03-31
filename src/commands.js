@@ -224,12 +224,14 @@ function registerCommands(app) {
   });
 
   // --- Admin DM Listener ---
-  app.message(async ({ message, client }) => {
-    if (message.channel_type !== 'im') return;
-    if (message.bot_id || message.subtype) return;
-    if (!isAdmin(message.user)) return;
+  // Use app.event('message') — app.message() can silently miss DMs in Socket Mode
+  // because channel_type is not always set on the payload. Check channel ID prefix instead.
+  app.event('message', async ({ event, client }) => {
+    if (!event.channel || !event.channel.startsWith('D')) return;
+    if (event.bot_id || event.subtype) return;
+    if (!isAdmin(event.user)) return;
 
-    await postAdminMenu(client, message.user);
+    await postAdminMenu(client, event.user);
   });
 
   // --- Admin Menu Button Handlers ---
@@ -240,7 +242,6 @@ function registerCommands(app) {
     if (!isAdmin(userId)) return;
     await client.chat.postMessage({ channel: userId, text: '📤 Sending monthly report messages to all members...' });
     await client.chat.postMessage({ channel: userId, text: await handleSend(client) });
-    await postAdminMenu(client, userId);
   });
 
   app.action('admin_reminder1', async ({ ack, body, client }) => {
@@ -249,7 +250,6 @@ function registerCommands(app) {
     if (!isAdmin(userId)) return;
     await client.chat.postMessage({ channel: userId, text: '🔔 Sending 1st reminder to pending members...' });
     await client.chat.postMessage({ channel: userId, text: await handleReminder(client, 1) });
-    await postAdminMenu(client, userId);
   });
 
   app.action('admin_reminder2', async ({ ack, body, client }) => {
@@ -258,7 +258,6 @@ function registerCommands(app) {
     if (!isAdmin(userId)) return;
     await client.chat.postMessage({ channel: userId, text: '⚠️ Sending 2nd reminder to pending members...' });
     await client.chat.postMessage({ channel: userId, text: await handleReminder(client, 2) });
-    await postAdminMenu(client, userId);
   });
 
   app.action('admin_reminder3', async ({ ack, body, client }) => {
@@ -267,7 +266,6 @@ function registerCommands(app) {
     if (!isAdmin(userId)) return;
     await client.chat.postMessage({ channel: userId, text: '🚨 Sending final reminder to pending members...' });
     await client.chat.postMessage({ channel: userId, text: await handleReminder(client, 3) });
-    await postAdminMenu(client, userId);
   });
 
   app.action('admin_export', async ({ ack, body, client }) => {
@@ -276,7 +274,6 @@ function registerCommands(app) {
     if (!isAdmin(userId)) return;
     await client.chat.postMessage({ channel: userId, text: '📊 Generating Excel report...' });
     await client.chat.postMessage({ channel: userId, text: await handleExport(client, userId) });
-    await postAdminMenu(client, userId);
   });
 
   app.action('admin_status', async ({ ack, body, client }) => {
@@ -284,7 +281,6 @@ function registerCommands(app) {
     const userId = body.user.id;
     if (!isAdmin(userId)) return;
     await client.chat.postMessage({ channel: userId, text: await handleStatus(client) });
-    await postAdminMenu(client, userId);
   });
 
   app.action('admin_list', async ({ ack, body, client }) => {
@@ -292,7 +288,6 @@ function registerCommands(app) {
     const userId = body.user.id;
     if (!isAdmin(userId)) return;
     await client.chat.postMessage({ channel: userId, text: handleList() });
-    await postAdminMenu(client, userId);
   });
 
   // --- Add Employee Modal ---
@@ -327,7 +322,6 @@ function registerCommands(app) {
     const userId = body.user.id;
     const selectedUser = view.state.values.user_block.selected_user.selected_user;
     await client.chat.postMessage({ channel: userId, text: handleAdd(selectedUser) });
-    await postAdminMenu(client, userId);
   });
 
   // --- Remove Employee Modal ---
@@ -362,7 +356,6 @@ function registerCommands(app) {
     const userId = body.user.id;
     const selectedUser = view.state.values.user_block.selected_user.selected_user;
     await client.chat.postMessage({ channel: userId, text: handleRemoveEmployee(selectedUser) });
-    await postAdminMenu(client, userId);
   });
 }
 
