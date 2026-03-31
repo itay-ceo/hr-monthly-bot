@@ -1,4 +1,4 @@
-const { sendReportToAll, sendReminders, getTargetMembers, getMonthName, getAdminUserId } = require('./messages');
+const { sendReportToAll, sendReminders, getTargetMembers, getAllHumanMembers, getMonthName, getAdminUserId } = require('./messages');
 const { generateExcel } = require('./excel');
 const { getReportsForMonth } = require('./db');
 const path = require('path');
@@ -68,6 +68,33 @@ function registerCommands(app) {
         break;
       }
 
+      case 'users': {
+        await respond({ text: '📋 Fetching workspace members...', response_type: 'ephemeral' });
+        const allMembers = await getAllHumanMembers(client);
+
+        if (allMembers.length === 0) {
+          await respond({ text: '⚠️ No members found.', response_type: 'ephemeral' });
+          break;
+        }
+
+        const header = '| # | Display Name | Real Name | Slack User ID |\n|---|---|---|---|';
+        const rows = allMembers.map((m, i) => {
+          const displayName = m.profile?.display_name || '_not set_';
+          const realName = m.real_name || '_not set_';
+          return `| ${i + 1} | ${displayName} | ${realName} | \`${m.id}\` |`;
+        });
+
+        const table = [
+          `*👥 Workspace Members (${allMembers.length})*`,
+          '',
+          header,
+          ...rows
+        ].join('\n');
+
+        await respond({ text: table, response_type: 'ephemeral' });
+        break;
+      }
+
       case 'status': {
         const members = await getTargetMembers(client);
         const reports = getReportsForMonth(month, year);
@@ -106,7 +133,8 @@ function registerCommands(app) {
             '• `/hr-report reminder2` - 2nd reminder (pending members)',
             '• `/hr-report reminder3` - Final reminder (pending members)',
             '• `/hr-report export` - Generate & download Excel report',
-            '• `/hr-report status` - See who has/hasn\'t submitted'
+            '• `/hr-report status` - See who has/hasn\'t submitted',
+            '• `/hr-report users` - List all workspace members with IDs'
           ].join('\n'),
           response_type: 'ephemeral'
         });
