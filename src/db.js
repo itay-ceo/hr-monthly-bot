@@ -54,6 +54,28 @@ function getDb() {
       console.log('[DB] Migration complete');
     }
 
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS employees (
+        user_id TEXT PRIMARY KEY,
+        added_at TEXT NOT NULL
+      )
+    `);
+
+    // One-time seed: if employees table is empty and EMPLOYEE_IDS env var is set, import them
+    const count = db.prepare('SELECT COUNT(*) AS cnt FROM employees').get().cnt;
+    if (count === 0) {
+      const envIds = process.env.EMPLOYEE_IDS;
+      if (envIds && envIds.trim()) {
+        const ids = envIds.split(',').map(s => s.trim()).filter(Boolean);
+        const insert = db.prepare('INSERT OR IGNORE INTO employees (user_id, added_at) VALUES (?, ?)');
+        const now = new Date().toISOString();
+        for (const id of ids) {
+          insert.run(id, now);
+        }
+        console.log(`[DB] Seeded ${ids.length} employees from EMPLOYEE_IDS env var`);
+      }
+    }
+
     console.log('[DB] Database initialized');
   }
   return db;
@@ -86,4 +108,26 @@ function hasSubmitted(userId, month, year) {
   return !!row;
 }
 
-module.exports = { getDb, saveReport, getReportsForMonth, hasSubmitted };
+function addEmployee(userId) {
+  const db = getDb();
+  const result = db.prepare('INSERT OR IGNORE INTO employees (user_id, added_at) VALUES (?, ?)').run(userId, new Date().toISOString());
+  return result.changes > 0;
+}
+
+function removeEmployee(userId) {
+  const db = getDb();
+  const result = db.prepare('DELETE FROM employees WHERE user_id = ?').run(userId);
+  return result.changes > 0;
+}
+
+function getEmployeeIds() {
+  const db = getDb();
+  return db.prepare('SELECT user_id FROM employees').all().map(r => r.user_id);
+}
+
+function isEmployeeTablePopulated() {
+  const db = getDb();
+  return db.prepare('SELECT COUNT(*) AS cnt FROM employees').get().cnt > 0;
+}
+
+module.exports = { getDb, saveReport, getReportsForMonth, hasSubmitted, addEmployee, removeEmployee, getEmployeeIds, isEmployeeTablePopulated };

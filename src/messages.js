@@ -97,14 +97,22 @@ async function getAllHumanMembers(client) {
 }
 
 async function getTargetMembers(client) {
+  const { getEmployeeIds, isEmployeeTablePopulated } = require('./db');
   let members = await getAllHumanMembers(client);
 
-  // Filter to EMPLOYEE_IDS if set
-  const employeeIds = parseEnvList('EMPLOYEE_IDS');
-  if (employeeIds.length > 0) {
-    const idSet = new Set(employeeIds);
+  // Filter to employees: prefer DB, fall back to env var
+  if (isEmployeeTablePopulated()) {
+    const dbIds = getEmployeeIds();
+    const idSet = new Set(dbIds);
     members = members.filter(m => idSet.has(m.id));
-    console.log(`[MSG] Filtered to ${members.length} employees from EMPLOYEE_IDS`);
+    console.log(`[MSG] Filtered to ${members.length} employees from database`);
+  } else {
+    const employeeIds = parseEnvList('EMPLOYEE_IDS');
+    if (employeeIds.length > 0) {
+      const idSet = new Set(employeeIds);
+      members = members.filter(m => idSet.has(m.id));
+      console.log(`[MSG] Filtered to ${members.length} employees from EMPLOYEE_IDS env`);
+    }
   }
 
   // In test mode, further filter to TEST_USERS only

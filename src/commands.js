@@ -1,6 +1,6 @@
 const { sendReportToAll, sendReminders, getTargetMembers, getAllHumanMembers, getMonthName, isAdmin } = require('./messages');
 const { generateExcel } = require('./excel');
-const { getReportsForMonth } = require('./db');
+const { getReportsForMonth, addEmployee, removeEmployee, getEmployeeIds } = require('./db');
 const path = require('path');
 
 function registerCommands(app) {
@@ -120,6 +120,43 @@ function registerCommands(app) {
       }
 
       default: {
+        // Handle add/remove with arguments
+        const addMatch = (command.text || '').match(/^add\s+<@(U[A-Z0-9]+)(?:\|[^>]*)?>$/i);
+        const removeMatch = (command.text || '').match(/^remove\s+<@(U[A-Z0-9]+)(?:\|[^>]*)?>$/i);
+
+        if (addMatch) {
+          const userId = addMatch[1];
+          const added = addEmployee(userId);
+          if (added) {
+            await respond({ text: `✅ Added <@${userId}> to the employee list.`, response_type: 'ephemeral' });
+          } else {
+            await respond({ text: `ℹ️ <@${userId}> is already in the employee list.`, response_type: 'ephemeral' });
+          }
+          break;
+        }
+
+        if (removeMatch) {
+          const userId = removeMatch[1];
+          const removed = removeEmployee(userId);
+          if (removed) {
+            await respond({ text: `✅ Removed <@${userId}> from the employee list.`, response_type: 'ephemeral' });
+          } else {
+            await respond({ text: `⚠️ <@${userId}> was not in the employee list.`, response_type: 'ephemeral' });
+          }
+          break;
+        }
+
+        if (subcommand === 'list') {
+          const ids = getEmployeeIds();
+          if (ids.length === 0) {
+            await respond({ text: 'No employees configured — all workspace members are targeted.', response_type: 'ephemeral' });
+          } else {
+            const rows = ids.map((id, i) => `${i + 1}. <@${id}>`).join('\n');
+            await respond({ text: `*👥 Employee List (${ids.length}):*\n${rows}`, response_type: 'ephemeral' });
+          }
+          break;
+        }
+
         await respond({
           text: [
             '*📋 HR Report Bot - Commands:*',
@@ -129,7 +166,10 @@ function registerCommands(app) {
             '• `/hr-report reminder3` - Final reminder (pending members)',
             '• `/hr-report export` - Generate & download Excel report',
             '• `/hr-report status` - See who has/hasn\'t submitted',
-            '• `/hr-report users` - List all workspace members with IDs'
+            '• `/hr-report users` - List all workspace members with IDs',
+            '• `/hr-report add @user` - Add employee to the list',
+            '• `/hr-report remove @user` - Remove employee from the list',
+            '• `/hr-report list` - Show configured employee list'
           ].join('\n'),
           response_type: 'ephemeral'
         });

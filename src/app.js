@@ -41,7 +41,15 @@ require('./db').getDb();
     console.log(`[CONFIG] TEST_USERS: ${process.env.TEST_USERS || '(none)'}`);
   }
   console.log(`[CONFIG] ADMIN_USER_IDS: ${process.env.ADMIN_USER_ID || '(not set)'}`);
-  console.log(`[CONFIG] EMPLOYEE_IDS: ${process.env.EMPLOYEE_IDS || '(all workspace members)'}`);
+
+  const { isEmployeeTablePopulated, getEmployeeIds } = require('./db');
+  if (isEmployeeTablePopulated()) {
+    console.log(`[CONFIG] Employees: from database (${getEmployeeIds().length} employees)`);
+  } else if (process.env.EMPLOYEE_IDS) {
+    console.log(`[CONFIG] Employees: from EMPLOYEE_IDS env`);
+  } else {
+    console.log(`[CONFIG] Employees: all workspace members`);
+  }
 
   console.log('');
   console.log('[APP] Listening for Slack events via Socket Mode');
