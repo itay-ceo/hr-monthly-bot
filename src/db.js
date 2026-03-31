@@ -55,6 +55,15 @@ function getDb() {
     }
 
     db.exec(`
+      CREATE TABLE IF NOT EXISTS active_period (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        month INTEGER NOT NULL,
+        year INTEGER NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    `);
+
+    db.exec(`
       CREATE TABLE IF NOT EXISTS employees (
         user_id TEXT PRIMARY KEY,
         added_at TEXT NOT NULL
@@ -130,4 +139,17 @@ function isEmployeeTablePopulated() {
   return db.prepare('SELECT COUNT(*) AS cnt FROM employees').get().cnt > 0;
 }
 
-module.exports = { getDb, saveReport, getReportsForMonth, hasSubmitted, addEmployee, removeEmployee, getEmployeeIds, isEmployeeTablePopulated };
+function setActivePeriod(month, year) {
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO active_period (id, month, year, updated_at) VALUES (1, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET month = excluded.month, year = excluded.year, updated_at = excluded.updated_at
+  `).run(month, year, new Date().toISOString());
+}
+
+function getActivePeriod() {
+  const db = getDb();
+  return db.prepare('SELECT month, year FROM active_period WHERE id = 1').get() || null;
+}
+
+module.exports = { getDb, saveReport, getReportsForMonth, hasSubmitted, addEmployee, removeEmployee, getEmployeeIds, isEmployeeTablePopulated, setActivePeriod, getActivePeriod };

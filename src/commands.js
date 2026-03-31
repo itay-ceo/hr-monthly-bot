@@ -1,14 +1,22 @@
 const { sendReportToAll, sendReminders, getTargetMembers, getAllHumanMembers, getMonthName, isAdmin } = require('./messages');
 const { generateExcel } = require('./excel');
-const { getReportsForMonth, addEmployee, removeEmployee, getEmployeeIds } = require('./db');
+const { getReportsForMonth, addEmployee, removeEmployee, getEmployeeIds, setActivePeriod, getActivePeriod } = require('./db');
 const path = require('path');
+
+// === Active Period ===
+
+function getActiveOrCurrentPeriod() {
+  const active = getActivePeriod();
+  if (active) return { month: active.month, year: active.year };
+  const now = new Date();
+  return { month: now.getMonth() + 1, year: now.getFullYear() };
+}
 
 // === Admin Menu ===
 
 function buildAdminMenu() {
-  const now = new Date();
-  const monthName = getMonthName(now.getMonth() + 1);
-  const year = now.getFullYear();
+  const { month, year } = getActiveOrCurrentPeriod();
+  const monthName = getMonthName(month);
 
   return {
     text: `📋 HR Report Bot — Admin Menu (${monthName} ${year})`,
@@ -19,7 +27,7 @@ function buildAdminMenu() {
       },
       {
         type: 'section',
-        text: { type: 'mrkdwn', text: `*Current period:* ${monthName} ${year}` }
+        text: { type: 'mrkdwn', text: `*Active period:* ${monthName} ${year}` }
       },
       { type: 'divider' },
       {
@@ -43,7 +51,8 @@ function buildAdminMenu() {
         type: 'actions',
         elements: [
           { type: 'button', text: { type: 'plain_text', text: '➕ Add Employee' }, action_id: 'admin_add_employee' },
-          { type: 'button', text: { type: 'plain_text', text: '➖ Remove Employee' }, action_id: 'admin_remove_employee' }
+          { type: 'button', text: { type: 'plain_text', text: '➖ Remove Employee' }, action_id: 'admin_remove_employee' },
+          { type: 'button', text: { type: 'plain_text', text: '📅 New Month' }, action_id: 'admin_new_month' }
         ]
       }
     ]
@@ -57,21 +66,20 @@ async function postAdminMenu(client, userId) {
 // === Shared Action Logic ===
 
 async function handleSend(client) {
-  const now = new Date();
-  const result = await sendReportToAll(client, now.getMonth() + 1, now.getFullYear());
-  return `✅ Done! Sent to ${result.sent}/${result.total} members.`;
+  const { month, year } = getActiveOrCurrentPeriod();
+  setActivePeriod(month, year);
+  const result = await sendReportToAll(client, month, year);
+  return `✅ Done! Sent to ${result.sent}/${result.total} members for ${getMonthName(month)} ${year}.`;
 }
 
 async function handleReminder(client, level) {
-  const now = new Date();
-  const result = await sendReminders(client, now.getMonth() + 1, now.getFullYear(), level);
-  return `✅ Reminder sent to ${result.sent} members.`;
+  const { month, year } = getActiveOrCurrentPeriod();
+  const result = await sendReminders(client, month, year, level);
+  return `✅ Reminder sent to ${result.sent} members for ${getMonthName(month)} ${year}.`;
 }
 
 async function handleExport(client, userId) {
-  const now = new Date();
-  const month = now.getMonth() + 1;
-  const year = now.getFullYear();
+  const { month, year } = getActiveOrCurrentPeriod();
   const filePath = await generateExcel(month, year);
   const dm = await client.conversations.open({ users: userId });
   await client.files.uploadV2({
@@ -81,13 +89,11 @@ async function handleExport(client, userId) {
     title: `HR Report - ${getMonthName(month)} ${year}`,
     initial_comment: `📊 HR Report for *${getMonthName(month)} ${year}*`
   });
-  return '✅ Excel report generated.';
+  return `✅ Excel report generated for ${getMonthName(month)} ${year}.`;
 }
 
 async function handleStatus(client) {
-  const now = new Date();
-  const month = now.getMonth() + 1;
-  const year = now.getFullYear();
+  const { month, year } = getActiveOrCurrentPeriod();
   const members = await getTargetMembers(client);
   const reports = getReportsForMonth(month, year);
   const submittedIds = new Set(reports.map(r => r.user_id));
@@ -110,6 +116,14 @@ async function handleStatus(client) {
     `⏳ *Pending (${pending.length}):*`,
     pendingList
   ].join('\n');
+}
+
+function handleNewMonth() {
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const year = now.getFullYear();
+  setActivePeriod(month, year);
+  return `📅 Active period set to *${getMonthName(month)} ${year}*.`;
 }
 
 function handleList() {
@@ -205,6 +219,11 @@ function registerCommands(app) {
         break;
       }
 
+      case 'new month': {
+        await respond({ text: handleNewMonth(), response_type: 'ephemeral' });
+        break;
+      }
+
       default: {
         const addMatch = (command.text || '').match(/^add\s+<@(U[A-Z0-9]+)(?:\|[^>]*)?>$/i);
         const removeMatch = (command.text || '').match(/^remove\s+<@(U[A-Z0-9]+)(?:\|[^>]*)?>$/i);
@@ -289,6 +308,13 @@ function registerCommands(app) {
     const userId = body.user.id;
     if (!isAdmin(userId)) return;
     await client.chat.postMessage({ channel: userId, text: handleList() });
+  });
+
+  app.action('admin_new_month', async ({ ack, body, client }) => {
+    await ack();
+    const userId = body.user.id;
+    if (!isAdmin(userId)) return;
+    await client.chat.postMessage({ channel: userId, text: handleNewMonth() });
   });
 
   // --- Add Employee Modal ---
