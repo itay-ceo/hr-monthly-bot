@@ -97,8 +97,9 @@ async function generateAndSendExcel(client, month, year) {
 
   for (const adminId of adminUserIds) {
     try {
+      const dm = await client.conversations.open({ users: adminId });
       await client.files.uploadV2({
-        channel_id: adminId,
+        channel_id: dm.channel.id,
         file: filePath,
         filename: path.basename(filePath),
         title: `HR Report - ${getMonthName(month)} ${year}`,

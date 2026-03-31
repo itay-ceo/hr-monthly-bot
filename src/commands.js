@@ -73,8 +73,9 @@ async function handleExport(client, userId) {
   const month = now.getMonth() + 1;
   const year = now.getFullYear();
   const filePath = await generateExcel(month, year);
+  const dm = await client.conversations.open({ users: userId });
   await client.files.uploadV2({
-    channel_id: userId,
+    channel_id: dm.channel.id,
     file: filePath,
     filename: path.basename(filePath),
     title: `HR Report - ${getMonthName(month)} ${year}`,
