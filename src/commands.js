@@ -1,4 +1,4 @@
-const { sendReportToAll, sendReminders, getTargetMembers, getAllHumanMembers, getMonthName, getAdminUserId } = require('./messages');
+const { sendReportToAll, sendReminders, getTargetMembers, getAllHumanMembers, getMonthName, isAdmin } = require('./messages');
 const { generateExcel } = require('./excel');
 const { getReportsForMonth } = require('./db');
 const path = require('path');
@@ -7,14 +7,9 @@ function registerCommands(app) {
   app.command('/hr-report', async ({ command, ack, respond, client }) => {
     await ack();
 
-    // Check if user is the configured admin
-    const adminUserId = getAdminUserId();
-    if (!adminUserId) {
-      await respond({ text: '⛔ ADMIN_USER_ID is not configured. Please set it in .env.', response_type: 'ephemeral' });
-      return;
-    }
-    if (command.user_id !== adminUserId) {
-      await respond({ text: '⛔ This command is only available to the configured admin.', response_type: 'ephemeral' });
+    // Check if user is a configured admin
+    if (!isAdmin(command.user_id)) {
+      await respond({ text: '⛔ This command is only available to configured admins.', response_type: 'ephemeral' });
       return;
     }
 

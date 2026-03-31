@@ -40,7 +40,7 @@ require('./db').getDb();
   if (testMode) {
     console.log(`[CONFIG] TEST_USERS: ${process.env.TEST_USERS || '(none)'}`);
   }
-  console.log(`[CONFIG] ADMIN_USER_ID: ${process.env.ADMIN_USER_ID || '(not set)'}`);
+  console.log(`[CONFIG] ADMIN_USER_IDS: ${process.env.ADMIN_USER_ID || '(not set)'}`);
   console.log(`[CONFIG] EMPLOYEE_IDS: ${process.env.EMPLOYEE_IDS || '(all workspace members)'}`);
 
   console.log('');

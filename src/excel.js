@@ -2,7 +2,7 @@ const ExcelJS = require('exceljs');
 const path = require('path');
 const fs = require('fs');
 const { getReportsForMonth } = require('./db');
-const { getMonthName, getAdminUserId } = require('./messages');
+const { getMonthName, getAdminUserIds } = require('./messages');
 
 async function generateExcel(month, year) {
   const reports = getReportsForMonth(month, year);
@@ -88,23 +88,29 @@ async function generateExcel(month, year) {
 
 async function generateAndSendExcel(client, month, year) {
   const filePath = await generateExcel(month, year);
-  const adminUserId = getAdminUserId();
+  const adminUserIds = getAdminUserIds();
 
-  if (!adminUserId) {
+  if (adminUserIds.length === 0) {
     console.error('[EXCEL] ADMIN_USER_ID is not configured — cannot send Excel report');
     return null;
   }
 
-  await client.files.uploadV2({
-    channel_id: adminUserId,
-    file: filePath,
-    filename: path.basename(filePath),
-    title: `HR Report - ${getMonthName(month)} ${year}`,
-    initial_comment: `📊 Here is the monthly HR report for *${getMonthName(month)} ${year}*.`
-  });
+  for (const adminId of adminUserIds) {
+    try {
+      await client.files.uploadV2({
+        channel_id: adminId,
+        file: filePath,
+        filename: path.basename(filePath),
+        title: `HR Report - ${getMonthName(month)} ${year}`,
+        initial_comment: `📊 Here is the monthly HR report for *${getMonthName(month)} ${year}*.`
+      });
+      console.log(`[EXCEL] Sent report to admin: ${adminId}`);
+    } catch (err) {
+      console.error(`[EXCEL] Failed to send report to admin ${adminId}: ${err.message}`);
+    }
+  }
 
-  console.log(`[EXCEL] Sent report to admin: ${adminUserId}`);
-  return { filePath, adminUserId };
+  return { filePath, adminUserIds };
 }
 
 module.exports = { generateExcel, generateAndSendExcel };

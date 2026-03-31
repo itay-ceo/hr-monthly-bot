@@ -162,8 +162,14 @@ async function sendReminders(client, month, year, level) {
   return { sent, total: members.length };
 }
 
-function getAdminUserId() {
-  return process.env.ADMIN_USER_ID || null;
+function getAdminUserIds() {
+  const val = process.env.ADMIN_USER_ID;
+  if (!val || !val.trim()) return [];
+  return val.split(',').map(s => s.trim()).filter(Boolean);
+}
+
+function isAdmin(userId) {
+  return getAdminUserIds().includes(userId);
 }
 
 module.exports = {
@@ -174,5 +180,6 @@ module.exports = {
   getTargetMembers,
   sendReportToAll,
   sendReminders,
-  getAdminUserId
+  getAdminUserIds,
+  isAdmin
 };
