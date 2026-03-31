@@ -76,7 +76,7 @@ async function generateExcel(month, year) {
   }
 
   // Save file
-  const dir = path.join(__dirname, '..', 'data', 'exports');
+  const dir = process.env.EXPORTS_PATH || path.join(__dirname, '..', 'data', 'exports');
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
   const filePath = path.join(dir, `HR_Report_${getMonthName(month)}_${year}.xlsx`);
