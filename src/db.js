@@ -54,6 +54,17 @@ function getDb() {
       console.log('[DB] Migration complete');
     }
 
+    // Migration: add child_sick_days and reserve_duty_days columns if missing
+    const currentColumns = db.prepare("PRAGMA table_info(reports)").all();
+    if (!currentColumns.some(c => c.name === 'child_sick_days')) {
+      console.log('[DB] Migrating: adding child_sick_days column');
+      db.exec(`ALTER TABLE reports ADD COLUMN child_sick_days REAL NOT NULL DEFAULT 0`);
+    }
+    if (!currentColumns.some(c => c.name === 'reserve_duty_days')) {
+      console.log('[DB] Migrating: adding reserve_duty_days column');
+      db.exec(`ALTER TABLE reports ADD COLUMN reserve_duty_days REAL NOT NULL DEFAULT 0`);
+    }
+
     db.exec(`
       CREATE TABLE IF NOT EXISTS active_period (
         id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -90,20 +101,22 @@ function getDb() {
   return db;
 }
 
-function saveReport({ userId, userName, month, year, sickDays, vacationDays }) {
+function saveReport({ userId, userName, month, year, sickDays, vacationDays, childSickDays = 0, reserveDutyDays = 0 }) {
   const db = getDb();
   const stmt = db.prepare(`
-    INSERT INTO reports (user_id, user_name, month, year, sick_days, vacation_days, submitted_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO reports (user_id, user_name, month, year, sick_days, vacation_days, child_sick_days, reserve_duty_days, submitted_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(user_id, month, year)
     DO UPDATE SET
       user_name = excluded.user_name,
       sick_days = excluded.sick_days,
       vacation_days = excluded.vacation_days,
+      child_sick_days = excluded.child_sick_days,
+      reserve_duty_days = excluded.reserve_duty_days,
       submitted_at = excluded.submitted_at
   `);
 
-  stmt.run(userId, userName, month, year, sickDays, vacationDays, new Date().toISOString());
+  stmt.run(userId, userName, month, year, sickDays, vacationDays, childSickDays, reserveDutyDays, new Date().toISOString());
 }
 
 function getReportsForMonth(month, year) {

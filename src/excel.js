@@ -17,6 +17,8 @@ async function generateExcel(month, year) {
     { header: 'Name', key: 'name', width: 25 },
     { header: 'Sick Days', key: 'sick', width: 14 },
     { header: 'Vacation Days', key: 'vacation', width: 16 },
+    { header: 'Child Sick Days', key: 'child_sick', width: 18 },
+    { header: 'Reserve Duty Days', key: 'reserve_duty', width: 20 },
     { header: 'Submitted Date', key: 'submitted', width: 22 }
   ];
 
@@ -37,6 +39,8 @@ async function generateExcel(month, year) {
       name: report.user_name,
       sick: report.sick_days,
       vacation: report.vacation_days,
+      child_sick: report.child_sick_days,
+      reserve_duty: report.reserve_duty_days,
       submitted: submittedDate
     });
   }
@@ -59,6 +63,8 @@ async function generateExcel(month, year) {
   if (reports.length > 0) {
     summaryRow.getCell(2).value = { formula: `SUM(B2:B${reports.length + 1})` };
     summaryRow.getCell(3).value = { formula: `SUM(C2:C${reports.length + 1})` };
+    summaryRow.getCell(4).value = { formula: `SUM(D2:D${reports.length + 1})` };
+    summaryRow.getCell(5).value = { formula: `SUM(E2:E${reports.length + 1})` };
   }
 
   summaryRow.font = { bold: true, size: 11 };
@@ -70,7 +76,7 @@ async function generateExcel(month, year) {
   const border = { top: borderStyle, left: borderStyle, bottom: borderStyle, right: borderStyle };
   for (let i = 1; i <= reports.length + 1; i++) {
     const row = sheet.getRow(i);
-    for (let j = 1; j <= 4; j++) {
+    for (let j = 1; j <= 6; j++) {
       row.getCell(j).border = border;
     }
   }
