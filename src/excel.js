@@ -1,7 +1,7 @@
 const ExcelJS = require('exceljs');
 const path = require('path');
 const fs = require('fs');
-const { getReportsForMonth } = require('./db');
+const { getReportsForMonth, getReceiptsForMonth } = require('./db');
 const { getMonthName, getAdminUserIds } = require('./messages');
 
 async function generateExcel(month, year) {
@@ -9,6 +9,13 @@ async function generateExcel(month, year) {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'HR Monthly Bot';
   workbook.created = new Date();
+
+  // Build receipt count lookup
+  const allReceipts = getReceiptsForMonth(month, year);
+  const receiptCountByUser = {};
+  for (const r of allReceipts) {
+    receiptCountByUser[r.user_id] = (receiptCountByUser[r.user_id] || 0) + 1;
+  }
 
   const sheet = workbook.addWorksheet(`${getMonthName(month)} ${year}`);
 
@@ -19,6 +26,9 @@ async function generateExcel(month, year) {
     { header: 'Vacation Days', key: 'vacation', width: 16 },
     { header: 'Child Sick Days', key: 'child_sick', width: 18 },
     { header: 'Reserve Duty Days', key: 'reserve_duty', width: 20 },
+    { header: 'Has Expenses', key: 'has_expenses', width: 15 },
+    { header: 'Expense Amount (₪)', key: 'expense_amount', width: 20 },
+    { header: 'Number of Receipts', key: 'receipt_count', width: 20 },
     { header: 'Submitted Date', key: 'submitted', width: 22 }
   ];
 
@@ -41,6 +51,9 @@ async function generateExcel(month, year) {
       vacation: report.vacation_days,
       child_sick: report.child_sick_days,
       reserve_duty: report.reserve_duty_days,
+      has_expenses: report.has_expenses ? 'Yes' : 'No',
+      expense_amount: report.expense_amount || 0,
+      receipt_count: receiptCountByUser[report.user_id] || 0,
       submitted: submittedDate
     });
   }
@@ -65,6 +78,8 @@ async function generateExcel(month, year) {
     summaryRow.getCell(3).value = { formula: `SUM(C2:C${reports.length + 1})` };
     summaryRow.getCell(4).value = { formula: `SUM(D2:D${reports.length + 1})` };
     summaryRow.getCell(5).value = { formula: `SUM(E2:E${reports.length + 1})` };
+    summaryRow.getCell(7).value = { formula: `SUM(G2:G${reports.length + 1})` };
+    summaryRow.getCell(8).value = { formula: `SUM(H2:H${reports.length + 1})` };
   }
 
   summaryRow.font = { bold: true, size: 11 };
@@ -76,7 +91,7 @@ async function generateExcel(month, year) {
   const border = { top: borderStyle, left: borderStyle, bottom: borderStyle, right: borderStyle };
   for (let i = 1; i <= reports.length + 1; i++) {
     const row = sheet.getRow(i);
-    for (let j = 1; j <= 6; j++) {
+    for (let j = 1; j <= 9; j++) {
       row.getCell(j).border = border;
     }
   }

@@ -65,6 +65,30 @@ function getDb() {
       db.exec(`ALTER TABLE reports ADD COLUMN reserve_duty_days REAL NOT NULL DEFAULT 0`);
     }
 
+    // Migration: add has_expenses and expense_amount columns if missing
+    const expenseColumns = db.prepare("PRAGMA table_info(reports)").all();
+    if (!expenseColumns.some(c => c.name === 'has_expenses')) {
+      console.log('[DB] Migrating: adding has_expenses column');
+      db.exec(`ALTER TABLE reports ADD COLUMN has_expenses INTEGER NOT NULL DEFAULT 0`);
+    }
+    if (!expenseColumns.some(c => c.name === 'expense_amount')) {
+      console.log('[DB] Migrating: adding expense_amount column');
+      db.exec(`ALTER TABLE reports ADD COLUMN expense_amount REAL NOT NULL DEFAULT 0`);
+    }
+
+    // Create receipts table
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS receipts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        month INTEGER NOT NULL,
+        year INTEGER NOT NULL,
+        slack_file_id TEXT NOT NULL,
+        file_url TEXT NOT NULL,
+        uploaded_at TEXT NOT NULL
+      )
+    `);
+
     db.exec(`
       CREATE TABLE IF NOT EXISTS active_period (
         id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -101,11 +125,11 @@ function getDb() {
   return db;
 }
 
-function saveReport({ userId, userName, month, year, sickDays, vacationDays, childSickDays = 0, reserveDutyDays = 0 }) {
+function saveReport({ userId, userName, month, year, sickDays, vacationDays, childSickDays = 0, reserveDutyDays = 0, hasExpenses = false, expenseAmount = 0 }) {
   const db = getDb();
   const stmt = db.prepare(`
-    INSERT INTO reports (user_id, user_name, month, year, sick_days, vacation_days, child_sick_days, reserve_duty_days, submitted_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO reports (user_id, user_name, month, year, sick_days, vacation_days, child_sick_days, reserve_duty_days, has_expenses, expense_amount, submitted_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(user_id, month, year)
     DO UPDATE SET
       user_name = excluded.user_name,
@@ -113,10 +137,12 @@ function saveReport({ userId, userName, month, year, sickDays, vacationDays, chi
       vacation_days = excluded.vacation_days,
       child_sick_days = excluded.child_sick_days,
       reserve_duty_days = excluded.reserve_duty_days,
+      has_expenses = excluded.has_expenses,
+      expense_amount = excluded.expense_amount,
       submitted_at = excluded.submitted_at
   `);
 
-  stmt.run(userId, userName, month, year, sickDays, vacationDays, childSickDays, reserveDutyDays, new Date().toISOString());
+  stmt.run(userId, userName, month, year, sickDays, vacationDays, childSickDays, reserveDutyDays, hasExpenses ? 1 : 0, expenseAmount, new Date().toISOString());
 }
 
 function getReportsForMonth(month, year) {
@@ -170,4 +196,27 @@ function deleteReportsForMonth(month, year) {
   return db.prepare('DELETE FROM reports WHERE month = ? AND year = ?').run(month, year).changes;
 }
 
-module.exports = { getDb, saveReport, getReportsForMonth, hasSubmitted, addEmployee, removeEmployee, getEmployeeIds, isEmployeeTablePopulated, setActivePeriod, getActivePeriod, deleteReportsForMonth };
+function saveReceipt(userId, month, year, slackFileId, fileUrl) {
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO receipts (user_id, month, year, slack_file_id, file_url, uploaded_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(userId, month, year, slackFileId, fileUrl, new Date().toISOString());
+}
+
+function getReceiptsForUser(userId, month, year) {
+  const db = getDb();
+  return db.prepare('SELECT * FROM receipts WHERE user_id = ? AND month = ? AND year = ?').all(userId, month, year);
+}
+
+function getReceiptsForMonth(month, year) {
+  const db = getDb();
+  return db.prepare('SELECT * FROM receipts WHERE month = ? AND year = ?').all(month, year);
+}
+
+function deleteReceiptsForMonth(month, year) {
+  const db = getDb();
+  return db.prepare('DELETE FROM receipts WHERE month = ? AND year = ?').run(month, year).changes;
+}
+
+module.exports = { getDb, saveReport, getReportsForMonth, hasSubmitted, addEmployee, removeEmployee, getEmployeeIds, isEmployeeTablePopulated, setActivePeriod, getActivePeriod, deleteReportsForMonth, saveReceipt, getReceiptsForUser, getReceiptsForMonth, deleteReceiptsForMonth };

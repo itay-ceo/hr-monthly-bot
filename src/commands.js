@@ -1,6 +1,7 @@
 const { sendReportToAll, sendReminders, getTargetMembers, getAllHumanMembers, getMonthName, isAdmin } = require('./messages');
 const { generateExcel } = require('./excel');
-const { getReportsForMonth, addEmployee, removeEmployee, getEmployeeIds, setActivePeriod, getActivePeriod, deleteReportsForMonth } = require('./db');
+const { getReportsForMonth, addEmployee, removeEmployee, getEmployeeIds, setActivePeriod, getActivePeriod, deleteReportsForMonth, saveReceipt, getReceiptsForUser, deleteReceiptsForMonth } = require('./db');
+const { receiptUploadSessions } = require('./modal');
 const path = require('path');
 
 // === Active Period ===
@@ -90,6 +91,27 @@ async function handleExport(client, userId) {
     title: `HR Report - ${getMonthName(month)} ${year}`,
     initial_comment: `📊 HR Report for *${getMonthName(month)} ${year}*`
   });
+
+  // Forward receipt images grouped by employee
+  const reports = getReportsForMonth(month, year);
+  for (const report of reports) {
+    if (!report.has_expenses) continue;
+    const receipts = getReceiptsForUser(report.user_id, month, year);
+    if (receipts.length === 0) continue;
+
+    await client.chat.postMessage({
+      channel: dm.channel.id,
+      text: `📎 Receipts from ${report.user_name} - ₪${report.expense_amount}:`
+    });
+
+    for (const receipt of receipts) {
+      await client.chat.postMessage({
+        channel: dm.channel.id,
+        text: receipt.file_url
+      });
+    }
+  }
+
   return `✅ Excel report generated for ${getMonthName(month)} ${year}.`;
 }
 
@@ -136,6 +158,7 @@ function handleList() {
 function handleReset() {
   const { month, year } = getActiveOrCurrentPeriod();
   const deleted = deleteReportsForMonth(month, year);
+  deleteReceiptsForMonth(month, year);
   return `✅ Reset complete. All submissions for ${getMonthName(month)} ${year} have been cleared (${deleted} removed). You can now send reports again.`;
 }
 
@@ -255,12 +278,52 @@ function registerCommands(app) {
     }
   });
 
-  // --- Admin DM Listener ---
+  // --- DM Listener (receipt uploads + admin menu) ---
   // Use app.event('message') — app.message() can silently miss DMs in Socket Mode
   // because channel_type is not always set on the payload. Check channel ID prefix instead.
   app.event('message', async ({ event, client }) => {
     if (!event.channel || !event.channel.startsWith('D')) return;
-    if (event.bot_id || event.subtype) return;
+    if (event.bot_id) return;
+
+    // Handle receipt upload mode
+    if (receiptUploadSessions.has(event.user)) {
+      const session = receiptUploadSessions.get(event.user);
+
+      // Handle file uploads (images)
+      if (event.files && event.files.length > 0) {
+        let imagesProcessed = 0;
+        for (const file of event.files) {
+          if (file.mimetype && file.mimetype.startsWith('image/')) {
+            saveReceipt(event.user, session.month, session.year, file.id, file.permalink || file.url_private);
+            imagesProcessed++;
+          }
+        }
+        if (imagesProcessed > 0) {
+          const receiptCount = getReceiptsForUser(event.user, session.month, session.year).length;
+          await client.chat.postMessage({
+            channel: event.channel,
+            text: `✅ Receipt ${receiptCount} received. Send more photos or type 'done' when finished.`
+          });
+        }
+        return;
+      }
+
+      // Handle "done" text
+      if (!event.subtype && event.text && event.text.toLowerCase().trim() === 'done') {
+        const receipts = getReceiptsForUser(event.user, session.month, session.year);
+        receiptUploadSessions.delete(event.user);
+        await client.chat.postMessage({
+          channel: event.channel,
+          text: `✅ All set! ${receipts.length} receipt${receipts.length !== 1 ? 's' : ''} saved for your expense claim of ₪${session.expenseAmount}.`
+        });
+        return;
+      }
+
+      // In upload mode but not a file or "done" — ignore
+      return;
+    }
+
+    if (event.subtype) return;
     if (!isAdmin(event.user)) return;
 
     await postAdminMenu(client, event.user);
