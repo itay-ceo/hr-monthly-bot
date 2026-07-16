@@ -7,7 +7,8 @@
       "Bash(node -e \"\nconst { setTimeout } = require\\('timers/promises'\\);\nconst cp = require\\('child_process'\\);\nconst child = cp.spawn\\('node', ['src/app.js'], { stdio: 'pipe', cwd: '/Users/itaynagler/hr-monthly-bot' }\\);\nlet output = '';\nchild.stdout.on\\('data', d => output += d.toString\\(\\)\\);\nchild.stderr.on\\('data', d => output += d.toString\\(\\)\\);\nsetTimeout\\(12000\\).then\\(\\(\\) => { child.kill\\(\\); console.log\\(output\\); }\\);\n\" 2>&1)",
       "Bash(tree -L 2 -I 'node_modules' /Users/itaynagler/hr-monthly-bot 2>/dev/null || find /Users/itaynagler/hr-monthly-bot -not -path '*/node_modules/*' -type f | head -30)",
       "Bash(npm uninstall node-cron 2>&1)",
-      "Bash(tree -L 2 /Users/itaynagler/Projects/hr-monthly-bot -I node_modules 2>/dev/null || find /Users/itaynagler/Projects/hr-monthly-bot -not -path \"*/node_modules/*\" -not -path \"*/.git/*\" -type f -o -type d | head -30)"
+      "Bash(tree -L 2 /Users/itaynagler/Projects/hr-monthly-bot -I node_modules 2>/dev/null || find /Users/itaynagler/Projects/hr-monthly-bot -not -path \"*/node_modules/*\" -not -path \"*/.git/*\" -type f -o -type d | head -30)",
+      "Bash(git add . && git commit -m \"support pdf receipts\" && git push)"
     ]
   }
 }

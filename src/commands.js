@@ -289,16 +289,17 @@ function registerCommands(app) {
     if (receiptUploadSessions.has(event.user)) {
       const session = receiptUploadSessions.get(event.user);
 
-      // Handle file uploads (images)
+      // Handle file uploads (images and PDFs)
       if (event.files && event.files.length > 0) {
-        let imagesProcessed = 0;
+        const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf'];
+        let filesProcessed = 0;
         for (const file of event.files) {
-          if (file.mimetype && file.mimetype.startsWith('image/')) {
+          if (file.mimetype && allowedTypes.includes(file.mimetype)) {
             saveReceipt(event.user, session.month, session.year, file.id, file.permalink || file.url_private);
-            imagesProcessed++;
+            filesProcessed++;
           }
         }
-        if (imagesProcessed > 0) {
+        if (filesProcessed > 0) {
           const receiptCount = getReceiptsForUser(event.user, session.month, session.year).length;
           await client.chat.postMessage({
             channel: event.channel,
